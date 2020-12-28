@@ -1,8 +1,13 @@
 from flask import Flask, redirect, url_for, flash, render_template, request
 from flask_sqlalchemy import SQLAlchemy
 
+from flask_login import LoginManager, current_user, login_user
+# from flask.Flask import g
+
 from flask_wtf import FlaskForm
 from wtforms import TextField, SubmitField, validators, ValidationError
+
+from flask_admin import BaseView, expose, Admin
 
 app = Flask(__name__)
 
@@ -11,6 +16,11 @@ app.config['SECRET_KEY'] = 'random string'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+
+admin = Admin(app)
 
 class User(db.Model):
     __tablename__ = 'user'
@@ -21,13 +31,23 @@ class User(db.Model):
     def __init__(self, id):
         self.id = id
         self.active = True
+        self.authenticated = True
         self.login_counts = 0
+
+    def loged_in(self):
+        self.login_counts += 1
 
     def is_active(self):
         return self.active
 
-    def loged_in(self):
-        self.login_counts += 1
+    def is_authenticated(self):
+        return True
+
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return self.id
 
     def save_to_db(self):
         db.session.add(self)
@@ -69,15 +89,27 @@ class LoginForm(FlaskForm):
     user_id = TextField('User id', validators=[validators.Optional(), Exist(User, User.id)])
     submit = SubmitField('Submit')
 
+class ModelView(BaseView):
+    @expose('/login')
+    def index(self):
+        return 'Hello World!'
+
+# admin.add_view(ModelView(User, db.session))
+# admin = Admin(app, url='/', index_view=ModelView(User, db.session, url='/', endpoint='admin'))
+
 #create all db tables --> init
 @app.before_first_request
 def create_tables():
-    # from models import ContactModel
     db.create_all()
+
+@login_manager.user_loader
+def load_user(user_id):
+    # g.user = current_user
+    return User.query.filter_by(id = user_id).first()
 
 @app.route('/')
 def show_all():
-    return render_template('show_all.html', users=User.query.all())
+    return render_template('show_all.html', users=User.query.all(), current_user=current_user)
 
 @app.route('/new', methods=['POST', 'GET'])
 def new():
@@ -91,6 +123,7 @@ def new():
             user = User(request.form['user_id'])
             db.session.add(user)
             db.session.commit()
+            login_user(user, remember=True)
             flash('Record was added successfully!')
             return redirect(url_for('show_all'))
 
@@ -109,6 +142,7 @@ def login():
             user = User.query.filter_by(id=request.form['user_id']).first()
             user.loged_in()
             db.session.commit()
+            login_user(user, remember=True)
             return redirect(url_for('show_all'))
 
     return render_template('login.html', form=form)
