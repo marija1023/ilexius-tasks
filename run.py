@@ -47,8 +47,26 @@ class Unique(object):
         if check:
             raise ValidationError(self.message)
 
+class Exist(object):
+    """ validator that checks field existence """
+    def __init__(self, model, field, message=None):
+        self.model = model
+        self.field = field
+        if not message:
+            message = 'this element doesn\'t exists'
+        self.message = message
+
+    def __call__(self, form, field):         
+        check = self.model.query.filter(self.field == field.data).first()
+        if not check:
+            raise ValidationError(self.message)
+
 class UserForm(FlaskForm):
     user_id = TextField('User id', validators=[validators.Optional(), Unique(User, User.id)])
+    submit = SubmitField('Submit')
+
+class LoginForm(FlaskForm):
+    user_id = TextField('User id', validators=[validators.Optional(), Exist(User, User.id)])
     submit = SubmitField('Submit')
 
 #create all db tables --> init
@@ -77,6 +95,23 @@ def new():
             return redirect(url_for('show_all'))
 
     return render_template('new.html', form=form)
+
+@app.route('/login', methods=['POST', 'GET'])
+def login():
+    error = None
+    form = LoginForm()
+
+    if request.method == 'POST':
+        if form.validate() == False:
+            flash("Validation failed ()")
+            return render_template('login.html', form=form)
+        else:
+            user = User.query.filter_by(id=request.form['user_id']).first()
+            user.loged_in()
+            db.session.commit()
+            return redirect(url_for('show_all'))
+
+    return render_template('login.html', form=form)
 
 if __name__ == '__main__':
     app.run(debug=True)
