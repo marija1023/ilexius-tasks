@@ -20,12 +20,14 @@
                             <thead>
                                 <tr>
                                     <th>User id</th>
+                                    <th>Number of logins</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for user in users %}
                                 <tr>
                                     <td>{{user.id}}</td>
+                                    <td>{{user.login_counts}}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>

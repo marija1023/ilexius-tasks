@@ -16,10 +16,18 @@ class User(db.Model):
     __tablename__ = 'user'
     id = db.Column('user_id', db.String(50), primary_key=True)
     active = db.Column(db.Boolean, default=True)
+    login_counts = db.Column(db.Integer)
 
     def __init__(self, id):
         self.id = id
         self.active = True
+        self.login_counts = 0
+
+    def is_active(self):
+        return self.active
+
+    def loged_in(self):
+        self.login_counts += 1
 
     def save_to_db(self):
         db.session.add(self)
