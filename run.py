@@ -8,6 +8,7 @@ from flask_wtf import FlaskForm
 from wtforms import TextField, SubmitField, validators, ValidationError
 
 from flask_admin import BaseView, expose, Admin
+from flask_appbuilder import ModelView
 
 app = Flask(__name__)
 
@@ -89,14 +90,6 @@ class LoginForm(FlaskForm):
     user_id = TextField('User id', validators=[validators.Optional(), Exist(User, User.id)])
     submit = SubmitField('Submit')
 
-class ModelView(BaseView):
-    @expose('/login')
-    def index(self):
-        return 'Hello World!'
-
-# admin.add_view(ModelView(User, db.session))
-# admin = Admin(app, url='/', index_view=ModelView(User, db.session, url='/', endpoint='admin'))
-
 #create all db tables --> init
 @app.before_first_request
 def create_tables():
@@ -121,6 +114,7 @@ def new():
             return render_template('new.html', form=form)
         else:
             user = User(request.form['user_id'])
+            user.loged_in()
             db.session.add(user)
             db.session.commit()
             login_user(user, remember=True)
