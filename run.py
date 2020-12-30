@@ -8,20 +8,20 @@ from flask_wtf import FlaskForm
 from wtforms import TextField, SubmitField, validators, ValidationError
 
 from flask_admin import BaseView, expose, Admin
-from flask_appbuilder import ModelView
+# from flask_appbuilder import ModelView
+from flask_admin.contrib.sqla import ModelView
 
 app = Flask(__name__)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///employees.sqlite3'
 app.config['SECRET_KEY'] = 'random string'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['FLASK_ADMIN_SWATCH'] = 'cerulean'
 
 db = SQLAlchemy(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
-
-admin = Admin(app)
 
 class User(db.Model):
     __tablename__ = 'user'
@@ -90,6 +90,43 @@ class LoginForm(FlaskForm):
     user_id = TextField('User id', validators=[validators.Optional(), Exist(User, User.id)])
     submit = SubmitField('Submit')
 
+class AdminModelView(ModelView):
+    form_columns = ('id', 'active','login_counts')
+    column_searchable_list = ('id')
+    
+    form_widget_args = {
+        'id': {
+            'readonly': True
+        }
+    }
+
+    def __init__(self, session, **kwargs):
+        super(AdminModelView, self).__init__(User, session, **kwargs)
+
+class AdminSettings(BaseView):
+    @expose('/login', methods=['POST', 'GET'])
+    def login(self):
+        error = None
+        form = LoginForm()
+
+        if request.method == 'POST':
+            if form.validate() == False:
+                flash("Validation failed ()")
+                return render_template('login.html', form=form)
+            else:
+                user = User.query.filter_by(id=request.form['user_id']).first()
+                user.loged_in()
+                db.session.commit()
+                login_user(user, remember=True)
+                return redirect(url_for('show_all'))
+
+        return render_template('login.html', form=form)
+
+admin = Admin(name="microadmin")
+admin.init_app(app)
+admin.add_view(AdminModelView(db.session))
+admin.add_view(AdminSettings(name='Admin Settings', endpoint='crud'))
+
 #create all db tables --> init
 @app.before_first_request
 def create_tables():
@@ -123,23 +160,23 @@ def new():
 
     return render_template('new.html', form=form)
 
-@app.route('/login', methods=['POST', 'GET'])
-def login():
-    error = None
-    form = LoginForm()
+# @app.route('/login', methods=['POST', 'GET'])
+# def login():
+#     error = None
+#     form = LoginForm()
 
-    if request.method == 'POST':
-        if form.validate() == False:
-            flash("Validation failed ()")
-            return render_template('login.html', form=form)
-        else:
-            user = User.query.filter_by(id=request.form['user_id']).first()
-            user.loged_in()
-            db.session.commit()
-            login_user(user, remember=True)
-            return redirect(url_for('show_all'))
+#     if request.method == 'POST':
+#         if form.validate() == False:
+#             flash("Validation failed ()")
+#             return render_template('login.html', form=form)
+#         else:
+#             user = User.query.filter_by(id=request.form['user_id']).first()
+#             user.loged_in()
+#             db.session.commit()
+#             login_user(user, remember=True)
+#             return redirect(url_for('show_all'))
 
-    return render_template('login.html', form=form)
+#     return render_template('login.html', form=form)
 
 if __name__ == '__main__':
     app.run(debug=True)
